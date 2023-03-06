@@ -74,3 +74,46 @@ class Autoencoder_linear(nn.Module):
         x = F.relu(self.dec4(x))
         x = F.relu(self.dec5(x))
         return x
+    
+class VAE(Autoencoder_linear):
+    def __init__(self):
+        super(VAE,self).__init__()
+        self.enc51 = nn.Linear(in_features=32,out_features=16)
+
+    def encode(self, x):
+        h1 = F.relu(self.enc1(x))
+        h1 = F.relu(self.enc2(h1))
+        h1 = F.relu(self.enc3(h1))
+        h1 = F.relu(self.enc4(h1))
+        return self.enc5(h1), self.enc51(h1)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
+
+    def decode(self, z):
+        h3 = F.relu(self.dec1(z))
+        h3 = F.relu(self.dec2(h3))
+        h3 = F.relu(self.dec3(h3))
+        h3 = F.relu(self.dec4(h3))
+        return torch.sigmoid(self.dec5(h3))
+
+    def forward(self, x):
+        mu, logvar = self.encode(x.view(-1, 784))
+        z = self.reparameterize(mu, logvar)
+        return self.decode(z), mu, logvar
+    
+    def final_loss(bce_loss, mu, logvar):
+        """
+        This function will add the reconstruction loss (BCELoss) and the
+        KL-Divergence.
+        KL-Divergence = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+        :param bce_loss: recontruction loss
+        :param mu: the mean from the latent vector
+        :param logvar: log variance from the latent vector
+        """
+        BCE = bce_loss
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        return BCE + KLD
